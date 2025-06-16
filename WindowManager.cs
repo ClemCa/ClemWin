@@ -96,8 +96,8 @@ namespace ClemWin
             layout.Tiles.Clear();
             var allWindows = Process.GetProcesses()
                 .Where(p => p.MainWindowHandle != IntPtr.Zero && !string.IsNullOrEmpty(p.MainWindowTitle))
-                .Select(p => (handle: p.MainWindowHandle, process: p, bounds: GetWindowBounds(p.MainWindowHandle)));
-            foreach (var (handle, process, bounds) in allWindows)
+                .Select((p, i) => (handle: p.MainWindowHandle, process: p, bounds: GetWindowBounds(p.MainWindowHandle), zIndex: i));
+            foreach (var (handle, process, bounds, zIndex) in allWindows)
             {
                 TileMode mode = TileMode.Normal;
                 // is it minimized?
@@ -114,7 +114,7 @@ namespace ClemWin
                     mode = TileMode.Maximized;
                 }
                 Tile tile = layout.GetMatchingTile(mode, bounds) ?? new(mode, bounds);
-                Window window = new(process.MainWindowTitle, process.ProcessName, process.Id.ToString());
+                Window window = new(process.MainWindowTitle, process.ProcessName, process.Id.ToString(), zIndex);
                 Console.WriteLine($"Window: {window.Title}, Process: {window.ProcessName}, Mode: {mode}, Bounds: {bounds.Left}, {bounds.Top}, {bounds.Right}, {bounds.Bottom}");
                 tile.Windows.Add(window);
                 layout.Tiles.Add(tile);
@@ -128,28 +128,16 @@ namespace ClemWin
             {
                 return; // Layout not found
             }
-            List<(IntPtr handle, Tile? tile)> allWindowsOrdered = new();
-            IntPtr topWindow = GetTopWindow(IntPtr.Zero);
-            while (topWindow != IntPtr.Zero)
+            List<(IntPtr handle, (Tile tile, Window window)? target)> allWindows = Process.GetProcesses().
+                Where(p => p.MainWindowHandle != IntPtr.Zero && !string.IsNullOrEmpty(p.MainWindowTitle))
+                .Select(p => (handle: p.MainWindowHandle, target: layout.SearchWindow(p.Id.ToString(), p.ProcessName, p.MainWindowTitle)))
+                .OrderBy(p => p.target?.window?.ZIndex ?? int.MaxValue)
+                .ToList();
+            foreach (var (handle, target) in allWindows)
             {
-                GetWindowThreadProcessId(topWindow, out uint processId);
-                var process = Process.GetProcessById((int)processId);
-                if (process.MainWindowHandle != IntPtr.Zero && !string.IsNullOrEmpty(process.MainWindowTitle))
-                {
-                    var tile = layout.SearchTile(process.Id.ToString(), process.ProcessName, process.MainWindowTitle);
-                    allWindowsOrdered.Add((process.MainWindowHandle, tile));
-                }
-                topWindow = GetWindow(topWindow, GW_HWNDNEXT); // next by Z order
-            }
-            // var allWindows = Process.GetProcesses()
-            //     .Where(p => p.MainWindowHandle != IntPtr.Zero)
-            //     .OrderBy(p => p.)
-            //     .Select(p => (handle: p.Handle, tile: layout.SearchTile(p.Id.ToString(), p.ProcessName, p.MainWindowTitle)))
-            foreach (var (handle, tile) in allWindowsOrdered)
-            {
-                if (tile == null)
+                if (!target.HasValue)
                     continue;
-                SetWindow(handle, tile);
+                SetWindow(handle, target.Value.tile);
             }
         }
         private Screen GetScreen(IntPtr handle)
@@ -197,7 +185,10 @@ namespace ClemWin
             if (currentBounds == tile.Bounds && isMinimized == (tile.Mode == TileMode.Minimized)
             && isMaximized == (tile.Mode == TileMode.Maximized) && isFullscreen == (tile.Mode == TileMode.Fullscreen))
             {
-                return; // No need to change anything, to avoid unintended flickering
+                // No need to change anything, to avoid unintended flickering
+                // Just put forward
+                _ = SetWindowPos(handle, HWND_TOP, 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
+                return;
             }
             Console.WriteLine($"Setting window: {tile.Mode}, {tile.Bounds.Left}, {tile.Bounds.Top}, {tile.Bounds.Right}, {tile.Bounds.Bottom}");
             Space space = tile.Bounds.ToDesktop();
@@ -267,7 +258,7 @@ namespace ClemWin
             }
             return null;
         }
-        (Tile tile, Window window)? SearchWindow(string processID, string processName, string title)
+        internal (Tile tile, Window window)? SearchWindow(string processID, string processName, string title)
         {
             Window? found = null;
             Tile? foundTile = null;
@@ -296,7 +287,7 @@ namespace ClemWin
             return found != null && foundTile != null ? (foundTile, found) : null;
         }
     }
-    public class Window(string title, string processName, string processID)
+    public class Window(string title, string processName, string processID, int zIndex)
     {
         [JsonInclude]
         public string Title = title;
@@ -304,7 +295,8 @@ namespace ClemWin
         public string ProcessName = processName;
         [JsonInclude]
         public string ProcessID = processID;
-        //TODO Z-ordering
+        [JsonInclude]
+        public int ZIndex = zIndex;
     }
 
     public class Tile(TileMode mode, Bounds bounds)
