@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Text.Json.Serialization;
 
 namespace ClemWin
 {
@@ -7,6 +8,10 @@ namespace ClemWin
     {
         internal List<Layout> Layouts = [];
         internal List<Screen> Screens = [];
+        internal Layout? GetLayout(int id)
+        {
+            return Layouts.FirstOrDefault(l => l.Id == id);
+        }
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         private static extern IntPtr GetTopWindow(IntPtr hWnd);
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
@@ -82,7 +87,7 @@ namespace ClemWin
         private const long WS_POPUP = 0x80000000L;
         public void SaveLayout(int id)
         {
-            Layout? layout = Layouts.FirstOrDefault(l => l.Id == id);
+            Layout? layout = GetLayout(id);
             if (layout == null)
             {
                 layout = new Layout(id);
@@ -228,9 +233,11 @@ namespace ClemWin
 
     }
 
-    class Layout
+    public class Layout
     {
+        [JsonInclude]
         public int Id;
+        [JsonInclude]
         public List<Tile> Tiles = [];
         public Layout(int id)
         {
@@ -260,7 +267,7 @@ namespace ClemWin
             }
             return null;
         }
-        public (Tile tile, Window window)? SearchWindow(string processID, string processName, string title)
+        (Tile tile, Window window)? SearchWindow(string processID, string processName, string title)
         {
             Window? found = null;
             Tile? foundTile = null;
@@ -279,20 +286,34 @@ namespace ClemWin
                     }
                 }
             }
+            if (found != null && level != MatchLevel.NoMatch && level != MatchLevel.ExactMatch)
+            {
+                // refresh window data with the latest info
+                found.ProcessID = processID;
+                found.ProcessName = processName;
+                found.Title = title;
+            }
             return found != null && foundTile != null ? (foundTile, found) : null;
         }
     }
-    class Window(string title, string processName, string processID)
+    public class Window(string title, string processName, string processID)
     {
+        [JsonInclude]
         public string Title = title;
+        [JsonInclude]
         public string ProcessName = processName;
+        [JsonInclude]
         public string ProcessID = processID;
+        //TODO Z-ordering
     }
 
-    class Tile(TileMode mode, Bounds bounds)
+    public class Tile(TileMode mode, Bounds bounds)
     {
+        [JsonInclude]
         public TileMode Mode = mode;
+        [JsonInclude]
         public Bounds Bounds = bounds;
+        [JsonInclude]
         public List<Window> Windows = [];
         MatchLevel GetMatchLevel(string processID, string processName, string title, Window window)
         {
@@ -314,7 +335,7 @@ namespace ClemWin
             }
             return MatchLevel.NoMatch;
         }
-        public MatchLevel Search(string processID, string processName, string title, out Window? result)
+        internal MatchLevel Search(string processID, string processName, string title, out Window? result)
         {
             result = null;
             if (Windows.Count == 0)
@@ -349,13 +370,17 @@ namespace ClemWin
         }
     }
 
-    class Screen(string name, int x, int y, int width, int height)
+    public class Screen(string name, int x, int y, int width, int height)
     {
+        [JsonInclude]
         public string Name = name;
-        public int ID = 0;
+        [JsonInclude]
         public int X = x;
+        [JsonInclude]
         public int Y = y;
+        [JsonInclude]
         public int Width = width;
+        [JsonInclude]
         public int Height = height;
         public Space ToDesktop(Bounds bounds)
         {
@@ -378,13 +403,18 @@ namespace ClemWin
         }
     }
 
-    class Bounds(Screen screen, int left, int right, int top, int bottom)
+    public class Bounds(Screen screen, int left, int right, int top, int bottom)
     {
+        [JsonInclude]
         public Screen Screen = screen;
         // left, right, top, bottom offset
+        [JsonInclude]
         public int Left = left;
+        [JsonInclude]
         public int Right = right;
+        [JsonInclude]
         public int Top = top;
+        [JsonInclude]
         public int Bottom = bottom;
         public Space ToDesktop()
         {
@@ -417,14 +447,14 @@ namespace ClemWin
             return HashCode.Combine(Screen.Name, Left, Right, Top, Bottom);
         }
     }
-    class Space(int x, int y, int width, int height)
+    public class Space(int x, int y, int width, int height)
     {
         public int X = x;
         public int Y = y;
         public int Width = width;
         public int Height = height;
     }
-    enum TileMode
+    public enum TileMode
     {
         Normal = 0,
         Fullscreen = 1,

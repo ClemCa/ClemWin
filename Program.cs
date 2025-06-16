@@ -68,7 +68,7 @@ public class HotkeyWindow : NativeWindow
         windowManager = new WindowManager();
         for (int i = 0; i < size; i++)
         {
-            var layout = Storage.LoadData(keys[i] + ".json", ref windowManager.Screens);
+            var layout = Storage.LoadData(i, ref windowManager.Screens);
             if (layout == null)
                 continue;
             windowManager.Layouts.Add(layout);
@@ -94,13 +94,22 @@ public class HotkeyWindow : NativeWindow
                 id -= hotkeys.Count;
                 Console.WriteLine($"Saving layout {id}");
                 windowManager.SaveLayout(id);
+                var layout = windowManager.GetLayout(id);
+                if (layout != null)
+                {
+                    Storage.SaveData(layout);
+                }
             }
             else
             {
                 Console.WriteLine($"Restoring layout {id}");
                 windowManager.RestoreLayout(id);
+                var layout = windowManager.GetLayout(id);
+                if (layout != null)
+                {
+                    Storage.SaveData(layout);
+                }
             }
-
         }
         base.WndProc(ref m);
     }

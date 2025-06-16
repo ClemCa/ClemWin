@@ -14,15 +14,15 @@ namespace ClemWin
             return storagePath;
         }
 
-        public static void SaveData(string fileName, Layout layout)
+        public static void SaveData(Layout layout)
         {
-            string filePath = Path.Combine(GetStoragePath(), fileName);
+            string filePath = Path.Combine(GetStoragePath(), layout.Id + ".json");
             File.WriteAllText(filePath, layout.ToJson());
         }
 
-        public static Layout? LoadData(string fileName, ref List<Screen> screens)
+        public static Layout? LoadData(int id, ref List<Screen> screens)
         {
-            string filePath = Path.Combine(GetStoragePath(), fileName);
+            string filePath = Path.Combine(GetStoragePath(), id + ".json");
             if (!File.Exists(filePath))
             {
                 return null;
@@ -31,7 +31,7 @@ namespace ClemWin
             Layout layout = json.FromJson();
             if (layout == null)
             {
-                throw new InvalidOperationException($"Failed to load layout from {fileName}. The file may be corrupted or in an unsupported format.");
+                throw new InvalidOperationException($"Failed to load layout from {filePath}. The file may be corrupted or in an unsupported format.");
             }
             foreach (var tile in layout.Tiles)
             {
@@ -58,10 +58,11 @@ namespace ClemWin
     {
         public static string ToJson(this Layout layout)
         {
-            return System.Text.Json.JsonSerializer.Serialize(layout, new System.Text.Json.JsonSerializerOptions
+            var value = System.Text.Json.JsonSerializer.Serialize(layout, new System.Text.Json.JsonSerializerOptions
             {
                 WriteIndented = true
             });
+            return value;
         }
 
         public static Layout FromJson(this string json)
