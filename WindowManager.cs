@@ -7,7 +7,12 @@ namespace ClemWin
     {
         internal List<Layout> Layouts = [];
         internal List<Screen> Screens = [];
-
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern IntPtr GetTopWindow(IntPtr hWnd);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern IntPtr GetWindow(IntPtr hWnd, uint uCmd);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 
@@ -58,15 +63,14 @@ namespace ClemWin
             }
         }
         private static readonly IntPtr HWND_TOP = new IntPtr(0);
+        private const uint GW_HWNDNEXT = 2;
         private const uint SWP_NOSIZE = 0x0001;
         private const uint SWP_NOMOVE = 0x0002;
         private const uint SWP_NOZORDER = 0x0004;
         private const uint SWP_NOACTIVATE = 0x0010;
-        private const uint SWP_FRAMECHANGED = 0x0020;
         private const int SW_MAXIMIZE = 3;
         private const int SW_MINIMIZE = 6;
         private const int SW_RESTORE = 9;
-        private const int SWP_SHOWWINDOW = 0x0040;
         private const int GWL_STYLE = -16;
         private const nint WS_OVERLAPPED = 0x00000000;
         private const nint WS_CAPTION = 0x00C00000;
@@ -86,7 +90,7 @@ namespace ClemWin
             }
             layout.Tiles.Clear();
             var allWindows = Process.GetProcesses()
-                .Where(p => p.MainWindowHandle != IntPtr.Zero)
+                .Where(p => p.MainWindowHandle != IntPtr.Zero && !string.IsNullOrEmpty(p.MainWindowTitle))
                 .Select(p => (handle: p.MainWindowHandle, process: p, bounds: GetWindowBounds(p.MainWindowHandle)));
             foreach (var (handle, process, bounds) in allWindows)
             {
@@ -106,6 +110,7 @@ namespace ClemWin
                 }
                 Tile tile = layout.GetMatchingTile(mode, bounds) ?? new(mode, bounds);
                 Window window = new(process.MainWindowTitle, process.ProcessName, process.Id.ToString());
+                Console.WriteLine($"Window: {window.Title}, Process: {window.ProcessName}, Mode: {mode}, Bounds: {bounds.Left}, {bounds.Top}, {bounds.Right}, {bounds.Bottom}");
                 tile.Windows.Add(window);
                 layout.Tiles.Add(tile);
             }
@@ -118,10 +123,24 @@ namespace ClemWin
             {
                 return; // Layout not found
             }
-            var allWindows = Process.GetProcesses()
-                .Where(p => p.MainWindowHandle != IntPtr.Zero)
-                .Select(p => (handle: p.Handle, tile: layout.SearchTile(p.Id.ToString(), p.ProcessName, p.MainWindowTitle)));
-            foreach (var (handle, tile) in allWindows)
+            List<(IntPtr handle, Tile? tile)> allWindowsOrdered = new();
+            IntPtr topWindow = GetTopWindow(IntPtr.Zero);
+            while (topWindow != IntPtr.Zero)
+            {
+                GetWindowThreadProcessId(topWindow, out uint processId);
+                var process = Process.GetProcessById((int)processId);
+                if (process.MainWindowHandle != IntPtr.Zero && !string.IsNullOrEmpty(process.MainWindowTitle))
+                {
+                    var tile = layout.SearchTile(process.Id.ToString(), process.ProcessName, process.MainWindowTitle);
+                    allWindowsOrdered.Add((process.MainWindowHandle, tile));
+                }
+                topWindow = GetWindow(topWindow, GW_HWNDNEXT); // next by Z order
+            }
+            // var allWindows = Process.GetProcesses()
+            //     .Where(p => p.MainWindowHandle != IntPtr.Zero)
+            //     .OrderBy(p => p.)
+            //     .Select(p => (handle: p.Handle, tile: layout.SearchTile(p.Id.ToString(), p.ProcessName, p.MainWindowTitle)))
+            foreach (var (handle, tile) in allWindowsOrdered)
             {
                 if (tile == null)
                     continue;
@@ -165,30 +184,30 @@ namespace ClemWin
         }
         private void SetWindow(IntPtr handle, Tile tile)
         {
+            // if it hasn't changed we don't do shit
+            var currentBounds = GetWindowBounds(handle);
+            bool isMinimized = IsIconic(handle);
+            bool isMaximized = IsZoomed(handle);
+            bool isFullscreen = (GetWindowLongPtr(handle, GWL_STYLE) & WS_POPUP) != 0;
+            if (currentBounds == tile.Bounds && isMinimized == (tile.Mode == TileMode.Minimized)
+            && isMaximized == (tile.Mode == TileMode.Maximized) && isFullscreen == (tile.Mode == TileMode.Fullscreen))
+            {
+                return; // No need to change anything, to avoid unintended flickering
+            }
+            Console.WriteLine($"Setting window: {tile.Mode}, {tile.Bounds.Left}, {tile.Bounds.Top}, {tile.Bounds.Right}, {tile.Bounds.Bottom}");
             Space space = tile.Bounds.ToDesktop();
             switch (tile.Mode)
             {
                 case TileMode.Normal:
-                    _ = SetWindowLong(handle, GWL_STYLE, WS_OVERLAPPEDWINDOW);
-                    _ = SetWindowPos(handle, HWND_TOP,
-                        tile.Bounds.Left, tile.Bounds.Top,
-                        tile.Bounds.Right - tile.Bounds.Left, tile.Bounds.Bottom - tile.Bounds.Top,
-                        SWP_NOZORDER | SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+                    if (isFullscreen)
+                        _ = SetWindowLong(handle, GWL_STYLE, WS_OVERLAPPEDWINDOW);
                     _ = ShowWindow(handle, SW_RESTORE);
                     break;
                 case TileMode.Fullscreen:
                     _ = SetWindowLong(handle, GWL_STYLE, new IntPtr(GetWindowLongPtr(handle, GWL_STYLE) & ~WS_POPUP));
-                    _ = SetWindowPos(handle, HWND_TOP,
-                        tile.Bounds.Left, tile.Bounds.Top,
-                        tile.Bounds.Right - tile.Bounds.Left, tile.Bounds.Bottom - tile.Bounds.Top,
-                        SWP_NOZORDER | SWP_FRAMECHANGED | SWP_NOACTIVATE);
                     return;
                 case TileMode.Maximized:
                     _ = SetWindowLong(handle, GWL_STYLE, WS_OVERLAPPEDWINDOW);
-                    _ = SetWindowPos(handle, HWND_TOP,
-                        space.X, space.Y,
-                        space.Width, space.Height,
-                        SWP_NOZORDER | SWP_NOSIZE | SWP_NOMOVE | SWP_FRAMECHANGED | SWP_SHOWWINDOW);
                     _ = ShowWindow(handle, SW_MAXIMIZE);
                     break;
                 case TileMode.Minimized:
@@ -343,8 +362,8 @@ namespace ClemWin
             return new Space(
                 X + bounds.Left,
                 Y + bounds.Top,
-                Width - (bounds.Right - bounds.Left),
-                Height - (bounds.Bottom - bounds.Top)
+                bounds.Right - bounds.Left,
+                bounds.Bottom - bounds.Top
             );
         }
         public Bounds FromDesktop(Space space)

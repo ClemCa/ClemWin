@@ -18,7 +18,9 @@ static class Program
                         Application.Exit();
                     })
                 }
-            }
+            },
+            Icon = SystemIcons.Application,
+            Text = "ClemWin Window Manager",
         };
         var hotkeyWindow = new HotkeyWindow();
         Application.Run();
@@ -60,8 +62,8 @@ public class HotkeyWindow : NativeWindow
         var keys = hotkeys.Keys.ToArray();
         for (int i = 0; i < size; i++)
         {
-            RegisterHotKey(Handle, i, MOD_WIN | MOD_SHIFT, hotkeys[keys[i]]);
-            RegisterHotKey(Handle, i + size, MOD_WIN, hotkeys[keys[i]]);
+            RegisterHotKey(Handle, i + size, MOD_WIN | MOD_ALT, hotkeys[keys[i]]); // Save
+            RegisterHotKey(Handle, i, MOD_WIN | MOD_CONTROL, hotkeys[keys[i]]); // Go
         }
         windowManager = new WindowManager();
         for (int i = 0; i < size; i++)
@@ -90,10 +92,12 @@ public class HotkeyWindow : NativeWindow
             if (id >= hotkeys.Count)
             {
                 id -= hotkeys.Count;
+                Console.WriteLine($"Saving layout {id}");
                 windowManager.SaveLayout(id);
             }
             else
             {
+                Console.WriteLine($"Restoring layout {id}");
                 windowManager.RestoreLayout(id);
             }
 
