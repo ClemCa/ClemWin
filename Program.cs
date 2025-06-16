@@ -26,7 +26,6 @@ static class Program
 
 
 }
-
 public class HotkeyWindow : NativeWindow
 {
     private WindowManager windowManager;
@@ -65,7 +64,13 @@ public class HotkeyWindow : NativeWindow
             RegisterHotKey(Handle, i + size, MOD_WIN, hotkeys[keys[i]]);
         }
         windowManager = new WindowManager();
-        //TODO persistant storage for window layouts
+        for (int i = 0; i < size; i++)
+        {
+            var layout = Storage.LoadData(keys[i] + ".json", ref windowManager.Screens);
+            if (layout == null)
+                continue;
+            windowManager.Layouts.Add(layout);
+        }
     }
     // Destructor
     ~HotkeyWindow()
