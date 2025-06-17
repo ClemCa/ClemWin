@@ -22,6 +22,26 @@ static class Program
             Icon = SystemIcons.Application,
             Text = "ClemWin Window Manager",
         };
+        icon.Click += (s, e) =>
+        {
+            if (e is MouseEventArgs mouseEventArgs && mouseEventArgs.Button == MouseButtons.Left)
+            {
+                // Open storage folder
+                string storagePath = Storage.GetStoragePath();
+                if (Directory.Exists(storagePath))
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = storagePath,
+                        UseShellExecute = true
+                    });
+                }
+                else
+                {
+                    MessageBox.Show("Storage folder does not exist.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        };
         var hotkeyWindow = new HotkeyWindow();
         Application.Run();
     }
