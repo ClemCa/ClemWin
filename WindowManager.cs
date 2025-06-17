@@ -348,8 +348,9 @@ namespace ClemWin
             {
                 // refresh window data with the latest info
                 found.Title = title;
-                //! not updating process here
-                // found.ProcessID = processID;
+                found.ProcessID = processID;
+                found.Handle = handle;
+                //! not updating process name here
                 // found.ProcessName = processName;
             }
             return found != null && foundTile != null ? (foundTile, found) : null;
@@ -379,11 +380,11 @@ namespace ClemWin
         public List<Window> Windows = [];
         MatchLevel GetMatchLevel(string processID, string processName, string title, nint handle, Window window)
         {
-            if (window.ProcessID == processID && window.ProcessName == processName && window.Title == title && window.Handle == handle)
+            if (window.ProcessID == processID && window.ProcessName == processName && window.Handle == handle) // except title as it can change easily in the same window
             {
                 return MatchLevel.ExactMatch;
             }
-            if (window.ProcessID == processID && window.ProcessName == processName && window.Title == title)
+            if (window.ProcessID == processID && window.ProcessName == processName && window.Title == title) // the same process AND title can help if the same process has several windows
             {
                 return MatchLevel.GreatMatch;
             }
