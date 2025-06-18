@@ -7,6 +7,13 @@ static class Program
     [STAThread]
     static void Main()
     {
+        // already running?
+        var mutex = new Mutex(false, "ClemWinWindowManagerMutex");
+        if (!mutex.WaitOne(0, false))
+        {
+            MessageBox.Show("ClemWin Window Manager is already running.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return;
+        }
         var icon = new NotifyIcon
         {
             Visible = true,
@@ -44,6 +51,12 @@ static class Program
         };
         var hotkeyWindow = new HotkeyWindow();
         Application.Run();
+        Application.ApplicationExit += (s, e) =>
+        {
+            icon.Dispose();
+            mutex.ReleaseMutex();
+            mutex.Dispose();
+        };
     }
 
 
