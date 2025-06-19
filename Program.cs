@@ -50,7 +50,8 @@ static class Program
             }
         };
         var hotkeyWindow = new HotkeyWindow();
-        Application.Run();
+        var searchWindow = new SearchWindow();
+        Application.Run(searchWindow);
         Application.ApplicationExit += (s, e) =>
         {
             icon.Dispose();
@@ -58,7 +59,6 @@ static class Program
             mutex.Dispose();
         };
     }
-
 
 }
 public class HotkeyWindow : NativeWindow
