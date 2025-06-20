@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Runtime.InteropServices;
 
 namespace ClemWin;
@@ -14,6 +15,8 @@ static class Program
             MessageBox.Show("ClemWin Window Manager is already running.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return;
         }
+        var hotkeyWindow = new HotkeyWindow();
+        var searchWindow = new SearchWindow(hotkeyWindow.WindowManager);
         var icon = new NotifyIcon
         {
             Visible = true,
@@ -21,36 +24,27 @@ static class Program
             {
                 Items =
                 {
+                    new ToolStripMenuItem("Search (Win + [Shift / Ctrl] + K)", null, (s, e) => {
+                        searchWindow.SimulateHotkey(0); // Simulate the hotkey for toggling search mode
+                    }),
+                    new ToolStripMenuItem("Open Folder", null, (s, e) => {
+                        OpenStorageFolder();
+                    }),
                     new ToolStripMenuItem("Exit", null, (s, e) => {
                         Application.Exit();
                     })
                 }
             },
-            Icon = SystemIcons.Application,
+            Icon = Utils.IconFromPNG("logo.png") ?? SystemIcons.Application,
             Text = "ClemWin Window Manager",
         };
         icon.Click += (s, e) =>
         {
             if (e is MouseEventArgs mouseEventArgs && mouseEventArgs.Button == MouseButtons.Left)
             {
-                // Open storage folder
-                string storagePath = Storage.GetStoragePath();
-                if (Directory.Exists(storagePath))
-                {
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                    {
-                        FileName = storagePath,
-                        UseShellExecute = true
-                    });
-                }
-                else
-                {
-                    MessageBox.Show("Storage folder does not exist.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
+                OpenStorageFolder();
             }
         };
-        var hotkeyWindow = new HotkeyWindow();
-        var searchWindow = new SearchWindow();
         Application.Run(searchWindow);
         Application.ApplicationExit += (s, e) =>
         {
@@ -59,11 +53,28 @@ static class Program
             mutex.Dispose();
         };
     }
-
+    private static void OpenStorageFolder()
+    {
+        // Open storage folder
+        string storagePath = Storage.GetStoragePath();
+        if (Directory.Exists(storagePath))
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = storagePath,
+                UseShellExecute = true
+            });
+        }
+        else
+        {
+            MessageBox.Show("Storage folder does not exist.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
 }
 public class HotkeyWindow : NativeWindow
 {
     private WindowManager windowManager;
+    public WindowManager WindowManager => windowManager;
     private const int MOD_ALT = 0x0001;
     private const int MOD_CONTROL = 0x0002;
     private const int MOD_SHIFT = 0x0004;
@@ -116,7 +127,6 @@ public class HotkeyWindow : NativeWindow
             UnregisterHotKey(Handle, i);
         }
     }
-
     protected override void WndProc(ref Message m)
     {
         if (m.Msg == 0x0312)

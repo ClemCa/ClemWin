@@ -13,12 +13,6 @@ namespace ClemWin
             return Layouts.FirstOrDefault(l => l.Id == id);
         }
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-        private static extern IntPtr GetTopWindow(IntPtr hWnd);
-        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-        private static extern IntPtr GetWindow(IntPtr hWnd, uint uCmd);
-        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-        private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
-        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
@@ -79,7 +73,6 @@ namespace ClemWin
         private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
 
         private static readonly IntPtr HWND_NOTOPMOST = new IntPtr(-2);
-        private const uint GW_HWNDNEXT = 2;
         private const uint SWP_NOSIZE = 0x0001;
         private const uint SWP_NOMOVE = 0x0002;
         private const uint SWP_NOZORDER = 0x0004;
@@ -111,24 +104,8 @@ namespace ClemWin
                 Layouts.Add(layout);
             }
             layout.Tiles.Clear();
-            List<(IntPtr handle, Process process, Bounds bounds, int zIndex)> allWindowsOrdered = new();
-            IntPtr topWindow = GetTopWindow(IntPtr.Zero);
-            while (topWindow != IntPtr.Zero)
-            {
-                GetWindowThreadProcessId(topWindow, out uint processId);
-                var process = Process.GetProcessById((int)processId);
-                if (process.MainWindowHandle != IntPtr.Zero && !string.IsNullOrEmpty(process.MainWindowTitle) && process.MainWindowHandle == topWindow)
-                {
-                    var match = allWindowsOrdered.Any(w => w.handle == process.MainWindowHandle);
-                    if (match)
-                    {
-                        Console.WriteLine($"!!! Duplicate window found: {process.MainWindowTitle} ({process.ProcessName})");
-                    }
-                    allWindowsOrdered.Add((process.MainWindowHandle, process, GetWindowBounds(process.MainWindowHandle), allWindowsOrdered.Count));
-                }
-                topWindow = GetWindow(topWindow, GW_HWNDNEXT); // next by Z order
-            }
-            foreach (var (handle, process, bounds, zIndex) in allWindowsOrdered)
+            var allWindowsOrdered = Fetcher.GetWindowsOrdered();
+            foreach (var (handle, process, zIndex) in allWindowsOrdered)
             {
                 TileMode mode = TileMode.Normal;
                 // is it minimized?
@@ -144,6 +121,7 @@ namespace ClemWin
                 {
                     mode = TileMode.Maximized;
                 }
+                Bounds bounds = GetWindowBounds(handle);
                 Tile tile = layout.GetMatchingTile(mode, bounds) ?? new(mode, bounds);
                 Window window = new(process.MainWindowTitle, process.ProcessName, process.Id.ToString(), handle, zIndex);
                 Console.WriteLine($"Window: {window.Title}, Process: {window.ProcessName}, Mode: {mode}, Bounds: {bounds.Left}, {bounds.Top}, {bounds.Right}, {bounds.Bottom}");
@@ -159,11 +137,12 @@ namespace ClemWin
             {
                 return; // Layout not found
             }
-            List<(Tile tile, Window window)?> allWindows = Process.GetProcesses().
-                Where(p => p.MainWindowHandle != IntPtr.Zero && !string.IsNullOrEmpty(p.MainWindowTitle))
-                .Select(p => layout.SearchWindow(p.Id.ToString(), p.ProcessName, p.MainWindowHandle, p.MainWindowTitle))
+            List<(Tile tile, Window window)?> allWindows = Fetcher.GetWindows()
+                .Select(p => layout.SearchWindow(p.process.Id.ToString(), p.process.ProcessName, p.handle, p.process.MainWindowTitle))
                 .Where(p => p.HasValue)
+#pragma warning disable CS8629 // Nullable value type may be null
                 .OrderByDescending(p => p.Value.window.ZIndex)
+#pragma warning restore CS8629 // Nullable value type may be null
                 .ToList();
             foreach (var target in allWindows)
             {
@@ -286,6 +265,19 @@ namespace ClemWin
             {
                 _ = ShowWindow(handle, SW_MAXIMIZE);
             }
+            _ = RedrawWindow(handle, IntPtr.Zero, IntPtr.Zero, RDW_INVALIDATE | RDW_UPDATENOW);
+        }
+
+        public void ShowWindow(nint handle)
+        {
+            bool minimized = IsIconic(handle);
+            if (minimized)
+            {
+                _ = ShowWindow(handle, SW_RESTORE);
+            }
+            _ = SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+            _ = SetWindowPos(handle, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+            _ = SetForegroundWindow(handle);
             _ = RedrawWindow(handle, IntPtr.Zero, IntPtr.Zero, RDW_INVALIDATE | RDW_UPDATENOW);
         }
 
