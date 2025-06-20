@@ -58,19 +58,13 @@ namespace ClemWin
     {
         public static string ToJson(this Layout layout)
         {
-            var value = System.Text.Json.JsonSerializer.Serialize(layout, new System.Text.Json.JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
+            var value = System.Text.Json.JsonSerializer.Serialize(layout, SourceGenerationContext.Default.Layout);
             return value;
         }
 
         public static Layout FromJson(this string json)
         {
-            return System.Text.Json.JsonSerializer.Deserialize<Layout>(json, new System.Text.Json.JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            }) ?? throw new InvalidOperationException("Failed to deserialize Layout from JSON.");
+            return System.Text.Json.JsonSerializer.Deserialize(json, SourceGenerationContext.Default.Layout) ?? throw new InvalidOperationException("Failed to deserialize Layout from JSON.");
         }
     }
 }

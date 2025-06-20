@@ -282,7 +282,15 @@ namespace ClemWin
         }
 
     }
-
+    [JsonSourceGenerationOptions(WriteIndented = true)]
+    [JsonSerializable(typeof(Layout))]
+    [JsonSerializable(typeof(Tile))]
+    [JsonSerializable(typeof(Bounds))]
+    [JsonSerializable(typeof(Screen))]
+    [JsonSerializable(typeof(Window))]
+    internal partial class SourceGenerationContext : JsonSerializerContext
+    {
+    }
     public class Layout
     {
         [JsonInclude]
