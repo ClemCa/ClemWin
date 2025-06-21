@@ -4,10 +4,31 @@ using System.Text.Json.Serialization;
 
 namespace ClemWin
 {
-    public class WindowManager
+    public class Windows
     {
+        public Windows(HotkeyWindow hotkeyWindow)
+        {
+            for (int i = 0; i < 10; i++)
+            {
+                KeyCode keyCode = Utils.KeyCodeFrom(i);
+                hotkeyWindow.RegisterHotkey(HotkeyModifiers.Win | HotkeyModifiers.Alt, keyCode, () =>
+                {
+                    Console.WriteLine($"Saving layout {i}");
+                    SaveLayout(i);
+                });
+                hotkeyWindow.RegisterHotkey(HotkeyModifiers.Win | HotkeyModifiers.Control, keyCode, () =>
+                {
+                    Console.WriteLine($"Restoring layout {i}");
+                    RestoreLayout(i);
+                });
+            }
+            hotkeyWindow.RegisterHotkey(HotkeyModifiers.Win | HotkeyModifiers.Alt, KeyCode.Space, WhitelistToggle);
+            hotkeyWindow.RegisterHotkey(HotkeyModifiers.Win | HotkeyModifiers.Alt, KeyCode.Enter, WhitelistToggle);
+            hotkeyWindow.RegisterHotkey(HotkeyModifiers.Win | HotkeyModifiers.Alt, KeyCode.Delete, ClearWhitelist);
+        }
         internal List<Layout> Layouts = [];
         internal List<Screen> Screens = [];
+        private WhiteListManager _whitelistManager = new();
         internal Layout? GetLayout(int id)
         {
             return Layouts.FirstOrDefault(l => l.Id == id);
@@ -107,6 +128,10 @@ namespace ClemWin
             var allWindowsOrdered = Fetcher.GetWindowsOrdered();
             foreach (var (handle, process, zIndex) in allWindowsOrdered)
             {
+                if (!_whitelistManager.InWhitelist(handle))
+                {
+                    continue;
+                }
                 TileMode mode = TileMode.Normal;
                 // is it minimized?
                 if (IsIconic(handle))
@@ -124,9 +149,14 @@ namespace ClemWin
                 Bounds bounds = GetWindowBounds(handle);
                 Tile tile = layout.GetMatchingTile(mode, bounds) ?? new(mode, bounds);
                 Window window = new(process.MainWindowTitle, process.ProcessName, process.Id.ToString(), handle, zIndex);
+
                 Console.WriteLine($"Window: {window.Title}, Process: {window.ProcessName}, Mode: {mode}, Bounds: {bounds.Left}, {bounds.Top}, {bounds.Right}, {bounds.Bottom}");
                 tile.Windows.Add(window);
                 layout.Tiles.Add(tile);
+            }
+            if (layout != null)
+            {
+                Storage.SaveData(layout);
             }
         }
 
@@ -139,7 +169,7 @@ namespace ClemWin
             }
             List<(Tile tile, Window window)?> allWindows = Fetcher.GetWindows()
                 .Select(p => layout.SearchWindow(p.process.Id.ToString(), p.process.ProcessName, p.handle, p.process.MainWindowTitle))
-                .Where(p => p.HasValue)
+                .Where(p => p.HasValue && _whitelistManager.InWhitelist(p.Value.window.Handle))
 #pragma warning disable CS8629 // Nullable value type may be null
                 .OrderByDescending(p => p.Value.window.ZIndex)
 #pragma warning restore CS8629 // Nullable value type may be null
@@ -150,6 +180,32 @@ namespace ClemWin
                     continue;
                 SetWindow((nint)target.Value.window.Handle, target.Value.tile, target.Value.window.Title);
             }
+            if (layout != null)
+            {
+                Storage.SaveData(layout);
+            }
+        }
+        public void WhitelistToggle()
+        {
+            (IntPtr handle, Process process) = Fetcher.GetCurrentWindow();
+            if (handle == IntPtr.Zero)
+            {
+                Console.WriteLine("No current window found to whitelist.");
+                return;
+            }
+            Window window = new Window(
+                process.MainWindowTitle,
+                process.ProcessName,
+                process.Id.ToString(),
+                handle.ToInt64(),
+                0 // ZIndex is not used in whitelist
+            );
+            _whitelistManager.Toggle(window);
+        }
+        public void ClearWhitelist()
+        {
+            _whitelistManager.Consume();
+            Console.WriteLine("Cleared whitelist");
         }
         private Screen GetScreen(IntPtr handle)
         {

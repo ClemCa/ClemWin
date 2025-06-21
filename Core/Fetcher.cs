@@ -42,6 +42,23 @@ namespace ClemWin
                 .ToList();
         }
 
+        public static (IntPtr handle, Process process) GetCurrentWindow()
+        {
+            IntPtr topWindow = GetTopWindow(IntPtr.Zero);
+            GetWindowThreadProcessId(topWindow, out uint processId);
+            Process process = Process.GetProcessById((int)processId);
+            while (topWindow != IntPtr.Zero && (process.MainWindowHandle == IntPtr.Zero || string.IsNullOrEmpty(process.MainWindowTitle)))
+            {
+                topWindow = GetWindow(topWindow, GW_HWNDNEXT);
+                if (topWindow != IntPtr.Zero)
+                {
+                    GetWindowThreadProcessId(topWindow, out processId);
+                    process = Process.GetProcessById((int)processId);
+                }
+            }
+            return (topWindow, process);
+        }
+
         public static SearchResult[] GetBySearch(string searchText)
         {
             var windows = GetWindowsOrdered()

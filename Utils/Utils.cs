@@ -43,5 +43,18 @@ namespace ClemWin
             }
             return null;
         }
+
+        public static KeyCode KeyCodeFrom(int number)
+        {
+            if (number < 0 || number > 9)
+            {
+                throw new ArgumentOutOfRangeException(nameof(number), "Invalid number for KeyCode.");
+            }
+            if (number == 0)
+            {
+                return KeyCode.Numpad0;
+            }
+            return KeyCode.Numpad1 + (number - 1);
+        }
     }
 }

@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 
 namespace ClemWin
 {
-    public class BackgroundWindow : Form
+    public class Background : Form, IBoundsReceiver
     {
         [DllImport("user32.dll")]
         static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
@@ -14,11 +14,9 @@ namespace ClemWin
         private const long WS_POPUP = 0x80000000L;
         private const long WS_CAPTION = 0x40000000L;
         private const long WS_SYSMENU = 0x10000000L;
-        private SearchWindow? searchWindow;
-        public BackgroundWindow(SearchWindow searchWindow)
+        public Background(Overlay overlay)
         {
-            this.searchWindow = searchWindow;
-            this.Bounds = searchWindow.Bounds;
+            this.Bounds = overlay.Bounds;
             this.FormBorderStyle = FormBorderStyle.None;
             this.TopMost = true;
             this.BackColor = Color.Black;
@@ -28,6 +26,7 @@ namespace ClemWin
             this.StartPosition = FormStartPosition.Manual;
             this.Opacity = 0.5;
             this.DoubleBuffered = true;
+            overlay.RegisterReceiver(this);
         }
 
         protected override CreateParams CreateParams
@@ -40,9 +39,9 @@ namespace ClemWin
                 return cp;
             }
         }
-        public void SetBounds(Rectangle bounds)
+        public void BoundsChanged(Rectangle workspace, Rectangle mainScreen)
         {
-            this.Bounds = bounds;
+            Bounds = workspace;
         }
     }
 }
