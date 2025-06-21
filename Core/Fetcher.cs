@@ -42,21 +42,20 @@ namespace ClemWin
                 .ToList();
         }
 
-        public static (IntPtr handle, Process process) GetCurrentWindow()
+        public static (IntPtr handle, Process? process) GetCurrentWindow()
         {
             IntPtr topWindow = GetTopWindow(IntPtr.Zero);
-            GetWindowThreadProcessId(topWindow, out uint processId);
-            Process process = Process.GetProcessById((int)processId);
-            while (topWindow != IntPtr.Zero && (process.MainWindowHandle == IntPtr.Zero || string.IsNullOrEmpty(process.MainWindowTitle)))
+            while (topWindow != IntPtr.Zero)
             {
-                topWindow = GetWindow(topWindow, GW_HWNDNEXT);
-                if (topWindow != IntPtr.Zero)
+                GetWindowThreadProcessId(topWindow, out uint processId);
+                var process = Process.GetProcessById((int)processId);
+                if (process.MainWindowHandle != IntPtr.Zero && !string.IsNullOrEmpty(process.MainWindowTitle) && process.MainWindowHandle == topWindow)
                 {
-                    GetWindowThreadProcessId(topWindow, out processId);
-                    process = Process.GetProcessById((int)processId);
+                    return (process.MainWindowHandle, process);
                 }
+                topWindow = GetWindow(topWindow, GW_HWNDNEXT); // next by Z order
             }
-            return (topWindow, process);
+            return (IntPtr.Zero, null);
         }
 
         public static List<(Window window, Bounds bounds)> GetWindowsOnScreen(Windows manager)

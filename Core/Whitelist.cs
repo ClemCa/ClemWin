@@ -9,22 +9,23 @@ namespace ClemWin
         {
             WhiteListMode = true;
             _whitelist ??= [];
-            if (_whitelist.RemoveAll((w) => w.Handle == window.Handle && w.ProcessID == window.ProcessID) > 0)
+            if (_whitelist.RemoveAll((w) => w.ProcessName == window.ProcessName && w.ProcessID == window.ProcessID) > 0)
             {
                 OnWhitelistUpdated?.Invoke();
                 return;
             }
             else
             {
+                Console.WriteLine($"Adding {window.ProcessName} ({window.ProcessID}) to whitelist");
                 _whitelist.Add(window);
                 OnWhitelistUpdated?.Invoke();
             }
         }
         public bool InWhitelist(Window window)
         {
-            return InWhitelist(window.Handle, window.ProcessID);
+            return InWhitelist(window.ProcessID, window.ProcessName);
         }
-        public bool InWhitelist(long handle, string processId)
+        public bool InWhitelist(string processId, string processName)
         {
             if (!WhiteListMode)
             {
@@ -34,7 +35,8 @@ namespace ClemWin
             {
                 return false;
             }
-            return _whitelist.Any((w) => w.Handle == handle && w.ProcessID == processId);
+            Console.WriteLine($"Checking whitelist for {processName} ({processId})");
+            return _whitelist.Any((w) => w.ProcessName == processName && w.ProcessID == processId);
         }
         public List<Window> GetWhitelist()
         {

@@ -21,6 +21,7 @@ namespace ClemWin
             this.Bounds = overlay.Bounds;
             this.FormBorderStyle = FormBorderStyle.None;
             this.TopMost = true;
+            this.TopLevel = true;
             this.BackColor = Color.Black;
             this.AllowTransparency = true;
             this.SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true);

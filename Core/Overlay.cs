@@ -24,6 +24,7 @@ namespace ClemWin
             this.WindowManager = windowManager;
             this.FormBorderStyle = FormBorderStyle.None;
             this.TopMost = true;
+            this.TopLevel = true;
             this.BackColor = Color.LimeGreen;
             this.TransparencyKey = Color.LimeGreen;
             this.AllowTransparency = true;
@@ -42,6 +43,9 @@ namespace ClemWin
             this.Owner = backgroundWindow;
             backgroundWindow.Show();
             backgroundWindow.Hide();
+            this.TopMost = true;
+            this.TopLevel = true;
+            this.Show();
 
             foreach (var receiver in receivers)
             {

@@ -130,7 +130,7 @@ namespace ClemWin
             var allWindowsOrdered = Fetcher.GetWindowsOrdered();
             foreach (var (handle, process, zIndex) in allWindowsOrdered)
             {
-                if (!whitelistManager.InWhitelist(handle, process.Id.ToString()))
+                if (!whitelistManager.InWhitelist(process.ProcessName, process.Id.ToString()))
                 {
                     continue;
                 }
@@ -190,8 +190,8 @@ namespace ClemWin
         public void WhitelistToggle()
         {
             Console.WriteLine("Toggling whitelist for current window");
-            (IntPtr handle, Process process) = Fetcher.GetCurrentWindow();
-            if (handle == IntPtr.Zero)
+            (IntPtr handle, Process? process) = Fetcher.GetCurrentWindow();
+            if (handle == IntPtr.Zero || process == null)
             {
                 Console.WriteLine("No current window found to whitelist.");
                 return;
