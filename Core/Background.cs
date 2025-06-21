@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 
 namespace ClemWin
 {
-    public class Background : Form, IBoundsReceiver
+    public class Background : ClemWinForm, IBoundsReceiver
     {
         [DllImport("user32.dll")]
         static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
@@ -14,6 +14,8 @@ namespace ClemWin
         private const long WS_POPUP = 0x80000000L;
         private const long WS_CAPTION = 0x40000000L;
         private const long WS_SYSMENU = 0x10000000L;
+        private List<IClemWinReceiver> receivers = [];
+        public Windows WindowManager { get; private set; }
         public Background(Overlay overlay)
         {
             this.Bounds = overlay.Bounds;
@@ -26,6 +28,7 @@ namespace ClemWin
             this.StartPosition = FormStartPosition.Manual;
             this.Opacity = 0.5;
             this.DoubleBuffered = true;
+            this.WindowManager = overlay.WindowManager;
             overlay.RegisterReceiver(this);
         }
 
@@ -42,6 +45,29 @@ namespace ClemWin
         public void BoundsChanged(Rectangle workspace, Rectangle mainScreen)
         {
             Bounds = workspace;
+            foreach (var receiver in receivers)
+            {
+                if (receiver is IBoundsReceiver boundsReceiver)
+                {
+                    boundsReceiver.BoundsChanged(workspace, mainScreen);
+                }
+            }
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            foreach (var receiver in receivers)
+            {
+                if (receiver is IDrawReceiver drawReceiver)
+                {
+                    drawReceiver.Draw(this, e.Graphics);
+                }
+            }
+        }
+        public override void RegisterReceiver(IClemWinReceiver receiver)
+        {
+            receivers.Add(receiver);
         }
     }
 }

@@ -6,8 +6,7 @@ using System.Diagnostics;
 
 namespace ClemWin
 {
-
-    public class Search : IDrawReceiver, IBoundsReceiver, IKeyboardReceiver, IHotkeyReceiver
+    public class Search : IClemWinReceiver, IDrawReceiver, IBoundsReceiver, IKeyboardReceiver, IHotkeyReceiver
     {
         [DllImport("user32.dll")]
         private static extern bool RegisterHotKey(IntPtr hWnd, int id, int fsModifiers, int vlc);
@@ -71,7 +70,8 @@ namespace ClemWin
             this.windowManager = windowManager;
             this.overlay = overlay;
             overlay.RegisterReceiver(this);
-            hotkeyWindow.RegisterHotkey(HotkeyModifiers.Win | HotkeyModifiers.Control, KeyCode.K, this);
+            overlay.RegisterLayer(this, () => SearchMode);
+            hotkeyWindow.RegisterHotkey(HotkeyModifiers.Win | HotkeyModifiers.Ctrl, KeyCode.K, this);
             hotkeyWindow.RegisterHotkey(HotkeyModifiers.Win | HotkeyModifiers.Shift, KeyCode.K, this);
             hotkeyWindow.RegisterHotkey(HotkeyModifiers.Win, KeyCode.K, this);
         }
@@ -79,8 +79,9 @@ namespace ClemWin
         {
             RepositionSearchBox(workspace, mainScreen);
         }
-        public void Draw(Overlay form, Graphics graphics)
+        public void Draw(ClemWinForm form, Graphics graphics)
         {
+            Console.WriteLine("Drawing search box and results.");
             ManageKeyboardInput(form);
             FetchResults();
             DrawSearchBox(graphics);
@@ -177,7 +178,6 @@ namespace ClemWin
                 searchBoxRect.Left + logoSize + 10,
                 searchBoxRect.Top + (searchBoxRect.Height - font.Height) / 2f
             ));
-            Console.WriteLine($"Search box drawn at: {searchBoxRect.X}, {searchBoxRect.Y}, {searchBoxRect.Width}, {searchBoxRect.Height}");
         }
         private void DrawResults(Graphics g)
         {
@@ -201,7 +201,7 @@ namespace ClemWin
             ));
         }
 
-        private void ManageKeyboardInput(Overlay form)
+        private void ManageKeyboardInput(ClemWinForm form)
         {
             if (SearchMode)
             {
@@ -230,7 +230,7 @@ namespace ClemWin
                 }
             }
         }
-        public bool KeyMessage(Overlay form, ref Message msg, Keys keyData)
+        public bool KeyMessage(ClemWinForm form, ref Message msg, Keys keyData)
         {
             if (!searchMode) return false;
             var keyCode = keyData & Keys.KeyCode;

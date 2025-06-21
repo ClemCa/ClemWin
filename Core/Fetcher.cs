@@ -59,6 +59,25 @@ namespace ClemWin
             return (topWindow, process);
         }
 
+        public static List<(Window window, Bounds bounds)> GetWindowsOnScreen(Windows manager)
+        {
+            var windows = GetWindowsOrdered();
+            List<Bounds> occupiedBounds = new();
+            List<(Window window, Bounds bounds)> windowsOnScreen = new();
+            foreach (var w in windows)
+            {
+                Window window = new(w.process.MainWindowTitle, w.process.ProcessName, w.process.Id.ToString(), w.process.MainWindowHandle, w.zIndex);
+                var bounds = manager.GetWindowBounds(w.handle);
+                if (DoesWindowCollide(window, bounds, occupiedBounds))
+                {
+                    continue; // Skip windows that collide with others, only draw frontmost windows
+                }
+                occupiedBounds.Add(bounds);
+                windowsOnScreen.Add((window, bounds));
+            }
+            return windowsOnScreen;
+        }
+
         public static SearchResult[] GetBySearch(string searchText)
         {
             var windows = GetWindowsOrdered()
@@ -69,32 +88,44 @@ namespace ClemWin
                 .ToArray();
             return windows;
         }
+        private static bool DoesWindowCollide(Window window, Bounds bounds, List<Bounds> occupiedBounds)
+        {
+            if (occupiedBounds.Count == 0) return false;
+            foreach (var b in occupiedBounds)
+            {
+                if (bounds.IntersectsWith(b))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
     }
     public class SearchResult
-    {
-        public IntPtr Handle { get; }
-        public Process Process { get; }
-        public string Title { get; }
-        public string ProcessName { get; }
-        public int ZIndex { get; }
-        public int Score { get; private set; }
-        public SearchResult(IntPtr handle, Process process, int zIndex)
         {
-            Handle = handle;
-            Process = process;
-            Title = process.MainWindowTitle;
-            ProcessName = process.ProcessName;
-            ZIndex = zIndex;
+            public IntPtr Handle { get; }
+            public Process Process { get; }
+            public string Title { get; }
+            public string ProcessName { get; }
+            public int ZIndex { get; }
+            public int Score { get; private set; }
+            public SearchResult(IntPtr handle, Process process, int zIndex)
+            {
+                Handle = handle;
+                Process = process;
+                Title = process.MainWindowTitle;
+                ProcessName = process.ProcessName;
+                ZIndex = zIndex;
+            }
+            public void CalculateScore(string searchText)
+            {
+                Score = 0;
+                Score += Searcher.ScoreSearch(ProcessName, searchText) * 5; // More valuable
+                Score += Searcher.ScoreSearch(Title, searchText) * 4; // Less valuable
+                if (Process.MainModule?.FileVersionInfo.ProductName != null)
+                    Score += Searcher.ScoreSearch(Process.MainModule.FileVersionInfo.ProductName, searchText) * 3;
+                if (Process.MainModule?.FileName != null)
+                    Score += Searcher.ScoreSearch(Process.MainModule.FileName, searchText); // Least valuable
+            }
         }
-        public void CalculateScore(string searchText)
-        {
-            Score = 0;
-            Score += Searcher.ScoreSearch(ProcessName, searchText) * 5; // More valuable
-            Score += Searcher.ScoreSearch(Title, searchText) * 4; // Less valuable
-            if (Process.MainModule?.FileVersionInfo.ProductName != null)
-                Score += Searcher.ScoreSearch(Process.MainModule.FileVersionInfo.ProductName, searchText) * 3;
-            if (Process.MainModule?.FileName != null)
-                Score += Searcher.ScoreSearch(Process.MainModule.FileName, searchText); // Least valuable
-        }
-    }
 }

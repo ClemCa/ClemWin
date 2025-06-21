@@ -6,7 +6,7 @@ using System.Diagnostics;
 
 namespace ClemWin
 {
-    public class Overlay : Form, IClemWinSender
+    public class Overlay : ClemWinForm
     {
         private const long WS_POPUP = 0x80000000L;
         private const long WS_CAPTION = 0x40000000L;
@@ -14,10 +14,14 @@ namespace ClemWin
         private System.Windows.Forms.Screen targetScreen;
         private List<IClemWinReceiver> receivers = [];
         private Background backgroundWindow;
+        private Dictionary<IClemWinReceiver, Func<bool>> layers = new();
+        public Windows WindowManager;
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public bool Intangible { get; set; } = true;
-        public Overlay()
+        public Background Background { get => backgroundWindow; }
+        public Overlay(Windows windowManager)
         {
+            this.WindowManager = windowManager;
             this.FormBorderStyle = FormBorderStyle.None;
             this.TopMost = true;
             this.BackColor = Color.LimeGreen;
@@ -79,6 +83,14 @@ namespace ClemWin
                 return CreateParams.ExStyle;
             }
         }
+        public System.Windows.Forms.Screen TargetScreen
+        {
+            get => targetScreen;
+        }
+        public Screen TargetScreenTransformed
+        {
+            get => WindowManager.GetScreen(TargetScreen.DeviceName);
+        }
         public bool UpdateTargetScreen()
         {
             var mainScreen = System.Windows.Forms.Screen.PrimaryScreen;
@@ -99,7 +111,7 @@ namespace ClemWin
             Bounds = SystemInformation.VirtualScreen;
             return true; // Target screen updated
         }
-        public void RegisterReceiver(IClemWinReceiver receiver)
+        public override void RegisterReceiver(IClemWinReceiver receiver)
         {
             ArgumentNullException.ThrowIfNull(receiver);
             if (!receivers.Contains(receiver))
@@ -113,8 +125,17 @@ namespace ClemWin
                 {
                     Invalidate(); // trigger repaint to show the new receiver
                 }
+                Console.WriteLine($"Receiver registered: {receiver.GetType().Name}");
             }
-            Console.WriteLine($"Receiver registered: {receiver.GetType().Name}");
+        }
+        public void RegisterLayer(IClemWinReceiver receiver, Func<bool> layerCondition)
+        {
+            ArgumentNullException.ThrowIfNull(receiver);
+            ArgumentNullException.ThrowIfNull(layerCondition);
+            if (!layers.ContainsKey(receiver))
+            {
+                layers.Add(receiver, layerCondition);
+            }
         }
         protected override void OnPaint(PaintEventArgs e)
         {
@@ -128,6 +149,14 @@ namespace ClemWin
                 }
                 if (receiver is IDrawReceiver drawReceiver)
                 {
+                    Console.WriteLine($"Drawing receiver: {drawReceiver.GetType().Name}");
+                    if (layers.TryGetValue(drawReceiver, out var layerCondition))
+                    {
+                        if (!layerCondition())
+                        {
+                            continue; // skip drawing if the layer condition is not met
+                        }
+                    }
                     drawReceiver.Draw(this, e.Graphics);
                 }
             }
@@ -143,10 +172,6 @@ namespace ClemWin
                     boundsReceiver.BoundsChanged(SystemInformation.VirtualScreen, targetScreen.Bounds);
                 }
             }
-        }
-        public new void SetStyle(ControlStyles flag, bool value)
-        {
-            base.SetStyle(flag, value);
         }
         public void ShowBackground()
         {

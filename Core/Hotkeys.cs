@@ -4,25 +4,25 @@ namespace ClemWin;
 public enum HotkeyModifiers
 {
     Alt = 1,
-    Control = 2,
+    Ctrl = 2,
     Shift = 4,
     Win = 8
 }
 public enum KeyCode
 {
-    Numpad1 = 0x60,
-    Numpad2 = 0x61,
-    Numpad3 = 0x62,
-    Numpad4 = 0x63,
-    Numpad5 = 0x64,
-    Numpad6 = 0x65,
-    Numpad7 = 0x66,
-    Numpad8 = 0x67,
-    Numpad9 = 0x68,
-    Numpad0 = 0x69,
+    Numpad0 = 0x60,
+    Numpad1 = 0x61,
+    Numpad2 = 0x62,
+    Numpad3 = 0x63,
+    Numpad4 = 0x64,
+    Numpad5 = 0x65,
+    Numpad6 = 0x66,
+    Numpad7 = 0x67,
+    Numpad8 = 0x68,
+    Numpad9 = 0x69,
     Space = 0x20,
     Delete = 0x2E,
-    Enter = 0x13,
+    Enter = 0x0D,
     K = 0x4B,
 }
 

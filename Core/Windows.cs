@@ -6,29 +6,31 @@ namespace ClemWin
 {
     public class Windows
     {
-        public Windows(HotkeyWindow hotkeyWindow)
+        public Windows(HotkeyWindow hotkeyWindow, WhiteList whiteList)
         {
+            whitelistManager = whiteList;
             for (int i = 0; i < 10; i++)
             {
                 KeyCode keyCode = Utils.KeyCodeFrom(i);
+                int layoutId = i + 0;
                 hotkeyWindow.RegisterHotkey(HotkeyModifiers.Win | HotkeyModifiers.Alt, keyCode, () =>
                 {
-                    Console.WriteLine($"Saving layout {i}");
-                    SaveLayout(i);
+                    Console.WriteLine($"Saving layout {layoutId}");
+                    SaveLayout(layoutId);
                 });
-                hotkeyWindow.RegisterHotkey(HotkeyModifiers.Win | HotkeyModifiers.Control, keyCode, () =>
+                hotkeyWindow.RegisterHotkey(HotkeyModifiers.Win | HotkeyModifiers.Ctrl, keyCode, () =>
                 {
-                    Console.WriteLine($"Restoring layout {i}");
-                    RestoreLayout(i);
+                    Console.WriteLine($"Restoring layout {layoutId}");
+                    RestoreLayout(layoutId);
                 });
             }
-            hotkeyWindow.RegisterHotkey(HotkeyModifiers.Win | HotkeyModifiers.Alt, KeyCode.Space, WhitelistToggle);
-            hotkeyWindow.RegisterHotkey(HotkeyModifiers.Win | HotkeyModifiers.Alt, KeyCode.Enter, WhitelistToggle);
-            hotkeyWindow.RegisterHotkey(HotkeyModifiers.Win | HotkeyModifiers.Alt, KeyCode.Delete, ClearWhitelist);
+            hotkeyWindow.RegisterHotkey(HotkeyModifiers.Ctrl | HotkeyModifiers.Shift, KeyCode.Enter, WhitelistToggle);
+            hotkeyWindow.RegisterHotkey(HotkeyModifiers.Win, KeyCode.Enter, WhitelistToggle);
+            hotkeyWindow.RegisterHotkey(HotkeyModifiers.Ctrl | HotkeyModifiers.Alt, KeyCode.Enter, ClearWhitelist);
         }
         internal List<Layout> Layouts = [];
         internal List<Screen> Screens = [];
-        private WhiteListManager _whitelistManager = new();
+        private WhiteList whitelistManager;
         internal Layout? GetLayout(int id)
         {
             return Layouts.FirstOrDefault(l => l.Id == id);
@@ -128,7 +130,7 @@ namespace ClemWin
             var allWindowsOrdered = Fetcher.GetWindowsOrdered();
             foreach (var (handle, process, zIndex) in allWindowsOrdered)
             {
-                if (!_whitelistManager.InWhitelist(handle))
+                if (!whitelistManager.InWhitelist(handle, process.Id.ToString()))
                 {
                     continue;
                 }
@@ -169,7 +171,7 @@ namespace ClemWin
             }
             List<(Tile tile, Window window)?> allWindows = Fetcher.GetWindows()
                 .Select(p => layout.SearchWindow(p.process.Id.ToString(), p.process.ProcessName, p.handle, p.process.MainWindowTitle))
-                .Where(p => p.HasValue && _whitelistManager.InWhitelist(p.Value.window.Handle))
+                .Where(p => p.HasValue && whitelistManager.InWhitelist(p.Value.window))
 #pragma warning disable CS8629 // Nullable value type may be null
                 .OrderByDescending(p => p.Value.window.ZIndex)
 #pragma warning restore CS8629 // Nullable value type may be null
@@ -187,6 +189,7 @@ namespace ClemWin
         }
         public void WhitelistToggle()
         {
+            Console.WriteLine("Toggling whitelist for current window");
             (IntPtr handle, Process process) = Fetcher.GetCurrentWindow();
             if (handle == IntPtr.Zero)
             {
@@ -200,14 +203,26 @@ namespace ClemWin
                 handle.ToInt64(),
                 0 // ZIndex is not used in whitelist
             );
-            _whitelistManager.Toggle(window);
+            whitelistManager.Toggle(window);
         }
         public void ClearWhitelist()
         {
-            _whitelistManager.Consume();
+            whitelistManager.Consume();
             Console.WriteLine("Cleared whitelist");
         }
-        private Screen GetScreen(IntPtr handle)
+        public Screen GetScreen(string name)
+        {
+            foreach (var screen in Screens)
+            {
+                if (screen.Name == name)
+                {
+                    return screen;
+                }
+            }
+            Console.WriteLine($"Screen not found: {name}");
+            return new Screen(name, 0, 0, 0, 0, (96, 96)); // Default screen if not found
+        }
+        public Screen GetScreen(IntPtr handle)
         {
             MONITORINFOEXA monitorInfo = new();
             monitorInfo.cbSize = Marshal.SizeOf<MONITORINFOEXA>();
@@ -220,17 +235,27 @@ namespace ClemWin
                     return screen;
                 }
             }
+            Console.WriteLine($"New screen found: {monitorInfo.szDevice}");
+            // get dpi
+            int dpiX, dpiY;
+            using (Graphics graphics = Graphics.FromHwnd(handle))
+            {
+                dpiX = (int)graphics.DpiX;
+                dpiY = (int)graphics.DpiY;
+            }
+
             var newScreen = new Screen(
                 monitorInfo.szDevice,
                 monitorInfo.rcMonitor.Left,
                 monitorInfo.rcMonitor.Top,
                 monitorInfo.rcMonitor.Right - monitorInfo.rcMonitor.Left,
-                monitorInfo.rcMonitor.Bottom - monitorInfo.rcMonitor.Top
+                monitorInfo.rcMonitor.Bottom - monitorInfo.rcMonitor.Top,
+                DPI: (dpiX, dpiY)
             );
             Screens.Add(newScreen);
             return newScreen;
         }
-        private Bounds GetWindowBounds(IntPtr handle)
+        public Bounds GetWindowBounds(IntPtr handle)
         {
             Space space = GetWindowSpace(handle);
             Screen screen = GetScreen(handle);
@@ -493,7 +518,7 @@ namespace ClemWin
         }
     }
 
-    public class Screen(string name, int x, int y, int width, int height)
+    public class Screen(string name, int x, int y, int width, int height, (int, int) DPI)
     {
         [JsonInclude]
         public string Name = name;
@@ -505,6 +530,12 @@ namespace ClemWin
         public int Width = width;
         [JsonInclude]
         public int Height = height;
+        [JsonInclude]
+        public (int X, int Y) DPI = DPI;
+        public Space ToDesktop()
+        {
+            return new Space(X, Y, Width, Height);
+        }
         public Space ToDesktop(Bounds bounds)
         {
             return new Space(
@@ -512,6 +543,15 @@ namespace ClemWin
                 Y + bounds.Top,
                 bounds.Right - bounds.Left,
                 bounds.Bottom - bounds.Top
+            );
+        }
+        public Space ToDesktopScaled(Bounds bounds)
+        {
+            return new Space(
+                (int)(X + bounds.Left * (DPI.X / 96.0)),
+                (int)(Y + bounds.Top * (DPI.Y / 96.0)),
+                (int)(bounds.Right - bounds.Left) * (DPI.X / 96),
+                (int)(bounds.Bottom - bounds.Top) * (DPI.Y / 96)
             );
         }
         public Bounds FromDesktop(Space space)
@@ -543,6 +583,10 @@ namespace ClemWin
         {
             return Screen.ToDesktop(this);
         }
+        public Space ToDesktopScaled()
+        {
+            return Screen.ToDesktopScaled(this);
+        }
         public static bool operator ==(Bounds a, Bounds b)
         {
             return a.Screen.Name == b.Screen.Name &&
@@ -554,6 +598,13 @@ namespace ClemWin
         public static bool operator !=(Bounds a, Bounds b)
         {
             return !(a == b);
+        }
+        public bool IntersectsWith(Bounds b)
+        {
+            if (Screen.Name != b.Screen.Name) return false;
+            bool horizontalOverlap = Left <= b.Right && b.Left <= Right; // horizontal equivalence
+            bool verticalOverlap = Top <= b.Bottom && b.Top <= Bottom; // vertical equivalence
+            return horizontalOverlap && verticalOverlap;
         }
 
         public override bool Equals(object? obj)

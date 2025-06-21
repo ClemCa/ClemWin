@@ -1,3 +1,4 @@
+using System.Configuration;
 using System.Reflection;
 using System.Runtime.InteropServices;
 
@@ -16,9 +17,11 @@ static class Program
             return;
         }
         var hotkeyWindow = new HotkeyWindow();
-        var windowManager = new Windows(hotkeyWindow);
-        var overlay = new Overlay();
+        var whitelist = new WhiteList();
+        var windowManager = new Windows(hotkeyWindow, whitelist);
+        var overlay = new Overlay(windowManager);
         var searchWindow = new Search(windowManager, overlay, hotkeyWindow);
+        var markers = new Markers(overlay, whitelist);
         var icon = new NotifyIcon
         {
             Visible = true,

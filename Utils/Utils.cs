@@ -50,11 +50,7 @@ namespace ClemWin
             {
                 throw new ArgumentOutOfRangeException(nameof(number), "Invalid number for KeyCode.");
             }
-            if (number == 0)
-            {
-                return KeyCode.Numpad0;
-            }
-            return KeyCode.Numpad1 + (number - 1);
+            return KeyCode.Numpad0 + number;
         }
     }
 }

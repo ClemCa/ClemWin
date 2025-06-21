@@ -1,5 +1,17 @@
 namespace ClemWin
 {
+    public class ClemWinForm : Form, IClemWinSender
+    {
+        public virtual void RegisterReceiver(IClemWinReceiver receiver)
+        {
+            throw new NotImplementedException();
+        }
+        public new void SetStyle(ControlStyles flag, bool value)
+        {
+            base.SetStyle(flag, value);
+        }
+    }
+
     public interface IClemWinSender
     {
         void RegisterReceiver(IClemWinReceiver receiver);
@@ -7,7 +19,7 @@ namespace ClemWin
     public interface IClemWinReceiver;
     public interface IDrawReceiver : IClemWinReceiver
     {
-        void Draw(Overlay form, Graphics graphics);
+        void Draw(ClemWinForm form, Graphics graphics);
     }
     public interface IBoundsReceiver : IClemWinReceiver
     {
@@ -15,7 +27,7 @@ namespace ClemWin
     }
     public interface IKeyboardReceiver : IClemWinReceiver
     {
-        bool KeyMessage(Overlay form, ref Message msg, Keys keyData);
+        bool KeyMessage(ClemWinForm form, ref Message msg, Keys keyData);
     }
     public interface IHotkeyReceiver : IClemWinReceiver
     {

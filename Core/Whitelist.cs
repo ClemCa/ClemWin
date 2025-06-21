@@ -1,30 +1,30 @@
 namespace ClemWin
 {
-    public class WhiteListManager
+    public class WhiteList
     {
         private List<Window> _whitelist = new();
         public bool WhiteListMode = false;
-
+        public static event Action OnWhitelistUpdated = delegate { };
         public void Toggle(Window window)
         {
-            if (!WhiteListMode)
+            WhiteListMode = true;
+            _whitelist ??= [];
+            if (_whitelist.RemoveAll((w) => w.Handle == window.Handle && w.ProcessID == window.ProcessID) > 0)
             {
-                WhiteListMode = true;
-            }
-            if (_whitelist == null)
-            {
-                _whitelist = [];
-            }
-            if (_whitelist.RemoveAll((w) => w.Handle == window.Handle) > 0)
-            {
+                OnWhitelistUpdated?.Invoke();
                 return;
             }
             else
             {
                 _whitelist.Add(window);
+                OnWhitelistUpdated?.Invoke();
             }
         }
-        public bool InWhitelist(long handle)
+        public bool InWhitelist(Window window)
+        {
+            return InWhitelist(window.Handle, window.ProcessID);
+        }
+        public bool InWhitelist(long handle, string processId)
         {
             if (!WhiteListMode)
             {
@@ -34,7 +34,7 @@ namespace ClemWin
             {
                 return false;
             }
-            return _whitelist.Any((w) => w.Handle == handle);
+            return _whitelist.Any((w) => w.Handle == handle && w.ProcessID == processId);
         }
         public List<Window> GetWhitelist()
         {
@@ -49,6 +49,7 @@ namespace ClemWin
             WhiteListMode = false;
             var result = _whitelist;
             _whitelist = new List<Window>();
+            OnWhitelistUpdated?.Invoke();
             return result;
         }
     }

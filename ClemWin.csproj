@@ -22,6 +22,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationIcon>logo.ico</ApplicationIcon>
+
+    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -32,6 +34,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-      <EmbeddedResource Include="logo.png" />
+    <EmbeddedResource Include="logo.png" />
   </ItemGroup>
 </Project>
