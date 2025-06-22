@@ -81,7 +81,6 @@ namespace ClemWin
         }
         public void Draw(ClemWinForm form, Graphics graphics)
         {
-            Console.WriteLine("Drawing search box and results.");
             ManageKeyboardInput(form);
             FetchResults();
             DrawSearchBox(graphics);
@@ -279,7 +278,7 @@ namespace ClemWin
                 return;
             }
             var firstResult = searchResults[0];
-            Console.WriteLine($"Picking first result: {firstResult.Title} ({firstResult.ProcessName})");
+            Console.WriteLine($"Switching to: {firstResult.Title} ({firstResult.ProcessName})");
             windowManager.ShowWindow(firstResult.Handle);
             SearchMode = false;
         }

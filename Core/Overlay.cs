@@ -42,6 +42,7 @@ namespace ClemWin
             backgroundWindow = new Background(this);
             this.Owner = backgroundWindow;
             backgroundWindow.Show();
+            this.Show();
             backgroundWindow.Hide();
             this.TopMost = true;
             this.TopLevel = true;
@@ -153,7 +154,6 @@ namespace ClemWin
                 }
                 if (receiver is IDrawReceiver drawReceiver)
                 {
-                    Console.WriteLine($"Drawing receiver: {drawReceiver.GetType().Name}");
                     if (layers.TryGetValue(drawReceiver, out var layerCondition))
                     {
                         if (!layerCondition())

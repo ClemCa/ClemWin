@@ -35,8 +35,11 @@ namespace ClemWin
             {
                 return false;
             }
+            Console.WriteLine($"Whitelist: {string.Join(", ", _whitelist.Select(w => $"{w.ProcessName} ({w.ProcessID})"))}");
             Console.WriteLine($"Checking whitelist for {processName} ({processId})");
-            return _whitelist.Any((w) => w.ProcessName == processName && w.ProcessID == processId);
+            var res = _whitelist.Any((w) => w.ProcessName == processName && w.ProcessID == processId);
+            Console.WriteLine($"Whitelist check result: {res}");
+            return res;
         }
         public List<Window> GetWhitelist()
         {

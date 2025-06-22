@@ -23,6 +23,16 @@ namespace ClemWin
                     Console.WriteLine($"Restoring layout {layoutId}");
                     RestoreLayout(layoutId);
                 });
+                Layout? layout = Storage.LoadData(layoutId, ref Screens);
+                if (layout != null)
+                {
+                    Layouts.Add(layout);
+                    Console.WriteLine($"Loaded layout {layoutId} with {layout.Tiles.Count} tiles");
+                }
+                else
+                {
+                    Console.WriteLine($"No layout found for ID {layoutId}");
+                }
             }
             hotkeyWindow.RegisterHotkey(HotkeyModifiers.Ctrl | HotkeyModifiers.Shift, KeyCode.Enter, WhitelistToggle);
             hotkeyWindow.RegisterHotkey(HotkeyModifiers.Win, KeyCode.Enter, WhitelistToggle);
@@ -130,7 +140,7 @@ namespace ClemWin
             var allWindowsOrdered = Fetcher.GetWindowsOrdered();
             foreach (var (handle, process, zIndex) in allWindowsOrdered)
             {
-                if (!whitelistManager.InWhitelist(process.ProcessName, process.Id.ToString()))
+                if (!whitelistManager.InWhitelist(process.Id.ToString(), process.ProcessName))
                 {
                     continue;
                 }
@@ -176,6 +186,7 @@ namespace ClemWin
                 .OrderByDescending(p => p.Value.window.ZIndex)
 #pragma warning restore CS8629 // Nullable value type may be null
                 .ToList();
+            Console.WriteLine($"Restoring layout {id} with {allWindows.Count} windows");
             foreach (var target in allWindows)
             {
                 if (target == null)
