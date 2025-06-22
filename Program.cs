@@ -16,6 +16,7 @@ static class Program
             MessageBox.Show("ClemWin Window Manager is already running.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return;
         }
+        Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
         var hotkeyWindow = new HotkeyWindow();
         var whitelist = new WhiteList();
         var windowManager = new Windows(hotkeyWindow, whitelist);
