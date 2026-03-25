@@ -45,6 +45,10 @@ namespace ClemWin
         private string lastSearch = "";
         private Overlay overlay;
         private SearchResult[] searchResults = [];
+        private int selectedIndex = -1;
+        private IntPtr selectedHandle = IntPtr.Zero;
+        private SolidBrush selectedResultBackground = new(Color.FromArgb(70, 255, 255, 255));
+        private SolidBrush highlightBrush = new(Color.FromArgb(255, 221, 87));
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public bool SearchMode
         {
@@ -58,6 +62,7 @@ namespace ClemWin
                     searchText = "";
                     lastSearch = "";
                     searchResults = Fetcher.GetBySearch(searchText);
+                    ClearSelection();
                     overlay.SetSearchActive(true);
                     overlay.ShowBackground();
                     overlay.BringToFront();
@@ -65,6 +70,7 @@ namespace ClemWin
                 }
                 else
                 {
+                    ClearSelection();
                     overlay.HideBackground();
                     overlay.SetSearchActive(false);
                 }
@@ -148,8 +154,11 @@ namespace ClemWin
             {
                 return; // no need to fetch results if search text hasn't changed
             }
+            int previousSelectedIndex = selectedIndex;
+            IntPtr previousSelectedHandle = selectedHandle;
             lastSearch = searchText;
             searchResults = Fetcher.GetBySearch(searchText);
+            RestoreSelection(previousSelectedHandle, previousSelectedIndex);
         }
         private void DrawSearchBox(Graphics g)
         {
@@ -191,10 +200,13 @@ namespace ClemWin
 
         private void DrawResult(Graphics g, SearchResult result, int index)
         {
-            g.DrawString($"[{result.ProcessName}] {result.Title}", resultFont, Brushes.White, new PointF(
-                resultRect.Left + 10,
-                resultRect.Top + 7.5f + (index * resultRect.Height) // can't explain why it's 7.5f and not 5 but welp
-            ));
+            float y = resultRect.Top + 7.5f + (index * resultRect.Height); // can't explain why it's 7.5f and not 5 but welp
+            if (index == selectedIndex)
+            {
+                g.FillRectangle(selectedResultBackground, resultRect.Left + 2, resultRect.Top + 2 + (index * resultRect.Height), resultRect.Width - 4, resultRect.Height + 4);
+            }
+
+            DrawHighlightedResultText(g, GetDisplayText(result), new PointF(resultRect.Left + 10, y));
         }
 
         private void ManageKeyboardInput(ClemWinForm form)
@@ -243,8 +255,30 @@ namespace ClemWin
                     }
                     form.Invalidate(); // trigger repaint to show updated search text
                     return true;
+                case Keys.Tab:
+                    if (selectedIndex < 0)
+                    {
+                        if (searchResults.Length > 0)
+                        {
+                            SetSelection(0);
+                            form.Invalidate();
+                        }
+                    }
+                    else
+                    {
+                        PickSelectedResult();
+                    }
+                    return true;
+                case Keys.Up:
+                    MoveSelection(-1);
+                    form.Invalidate();
+                    return true;
+                case Keys.Down:
+                    MoveSelection(1);
+                    form.Invalidate();
+                    return true;
                 case Keys.Enter:
-                    PickFirstResult();
+                    PickSelectedResult();
                     return true;
                 default:
                     var keyChar = KeyToChar(keyCode, (keyData & Keys.Shift) != 0, (keyData & Keys.Control) != 0, (keyData & Keys.Alt) != 0);
@@ -268,16 +302,189 @@ namespace ClemWin
             SearchMode = false;
             return;
         }
-        private void PickFirstResult()
+        private void PickSelectedResult()
         {
             if (searchResults.Length == 0)
             {
                 return;
             }
-            var firstResult = searchResults[0];
-            Console.WriteLine($"Switching to: {firstResult.Title} ({firstResult.ProcessName})");
-            windowManager.ShowWindow(firstResult.Handle);
+
+            int index = selectedIndex >= 0 ? selectedIndex : 0;
+            var selectedResult = searchResults[index];
+            Console.WriteLine($"Switching to: {selectedResult.Title} ({selectedResult.ProcessName})");
+            windowManager.ShowWindow(selectedResult.Handle);
             SearchMode = false;
+        }
+        private void MoveSelection(int delta)
+        {
+            if (searchResults.Length == 0)
+            {
+                ClearSelection();
+                return;
+            }
+
+            if (selectedIndex < 0)
+            {
+                SetSelection(delta < 0 ? searchResults.Length - 1 : 0);
+                return;
+            }
+
+            SetSelection(Math.Clamp(selectedIndex + delta, 0, searchResults.Length - 1));
+        }
+        private void RestoreSelection(IntPtr previousSelectedHandle, int previousSelectedIndex)
+        {
+            if (searchResults.Length == 0)
+            {
+                ClearSelection();
+                return;
+            }
+
+            if (previousSelectedHandle != IntPtr.Zero)
+            {
+                int matchingIndex = Array.FindIndex(searchResults, result => result.Handle == previousSelectedHandle);
+                if (matchingIndex >= 0)
+                {
+                    SetSelection(matchingIndex);
+                    return;
+                }
+            }
+
+            if (previousSelectedIndex >= 0)
+            {
+                SetSelection(Math.Clamp(previousSelectedIndex - 1, 0, searchResults.Length - 1));
+                return;
+            }
+
+            ClearSelection();
+        }
+        private void SetSelection(int index)
+        {
+            if (index < 0 || index >= searchResults.Length)
+            {
+                ClearSelection();
+                return;
+            }
+
+            selectedIndex = index;
+            selectedHandle = searchResults[index].Handle;
+        }
+        private void ClearSelection()
+        {
+            selectedIndex = -1;
+            selectedHandle = IntPtr.Zero;
+        }
+        private string GetDisplayText(SearchResult result)
+        {
+            return $"[{result.ProcessName}] {result.Title}";
+        }
+        private void DrawHighlightedResultText(Graphics g, string text, PointF location)
+        {
+            var highlightRanges = GetHighlightRanges(text, searchText);
+            using StringFormat format = StringFormat.GenericTypographic;
+            if (highlightRanges.Count == 0)
+            {
+                DrawTextSegment(g, text, Brushes.White, location, format);
+                return;
+            }
+
+            float x = location.X;
+            int cursor = 0;
+
+            foreach (var (start, length) in highlightRanges)
+            {
+                if (start > cursor)
+                {
+                    string segment = text.Substring(cursor, start - cursor);
+                    x += DrawTextSegment(g, segment, Brushes.White, new PointF(x, location.Y), format);
+                }
+
+                string highlightedSegment = text.Substring(start, length);
+                x += DrawTextSegment(g, highlightedSegment, highlightBrush, new PointF(x, location.Y), format);
+                cursor = start + length;
+            }
+
+            if (cursor < text.Length)
+            {
+                string trailingSegment = text.Substring(cursor);
+                DrawTextSegment(g, trailingSegment, Brushes.White, new PointF(x, location.Y), format);
+            }
+        }
+        private float DrawTextSegment(Graphics g, string text, Brush brush, PointF location, StringFormat format)
+        {
+            float x = location.X;
+            float spaceWidth = g.MeasureString("a a", resultFont, PointF.Empty, format).Width - g.MeasureString("aa", resultFont, PointF.Empty, format).Width;
+            for (int i = 0; i < text.Length; i++)
+            {
+                string character = text[i].ToString();
+                if (text[i] == ' ')
+                {
+                    x += spaceWidth;
+                    continue;
+                }
+
+                float y = location.Y;
+                if (text[i] == '[' || text[i] == ']')
+                {
+                    y -= 2f;
+                }
+
+                g.DrawString(character, resultFont, brush, new PointF(x, y), format);
+                x += g.MeasureString(character, resultFont, PointF.Empty, format).Width;
+            }
+
+            return x - location.X;
+        }
+        private List<(int start, int length)> GetHighlightRanges(string text, string currentSearch)
+        {
+            List<(int start, int length)> ranges = new();
+            if (string.IsNullOrWhiteSpace(currentSearch))
+            {
+                return ranges;
+            }
+
+            foreach (string token in currentSearch.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                int startIndex = 0;
+                while (startIndex < text.Length)
+                {
+                    int index = text.IndexOf(token, startIndex, StringComparison.InvariantCultureIgnoreCase);
+                    if (index < 0)
+                    {
+                        break;
+                    }
+
+                    ranges.Add((index, token.Length));
+                    startIndex = index + token.Length;
+                }
+            }
+
+            if (ranges.Count <= 1)
+            {
+                return ranges;
+            }
+
+            ranges = ranges
+                .OrderBy(range => range.start)
+                .ToList();
+
+            List<(int start, int length)> mergedRanges = [ranges[0]];
+            for (int i = 1; i < ranges.Count; i++)
+            {
+                var currentRange = ranges[i];
+                var previousRange = mergedRanges[^1];
+                int previousEnd = previousRange.start + previousRange.length;
+                int currentEnd = currentRange.start + currentRange.length;
+
+                if (currentRange.start <= previousEnd)
+                {
+                    mergedRanges[^1] = (previousRange.start, Math.Max(previousEnd, currentEnd) - previousRange.start);
+                    continue;
+                }
+
+                mergedRanges.Add(currentRange);
+            }
+
+            return mergedRanges;
         }
         public static string KeyToChar(Keys key, bool shift, bool control, bool alt, string fallback = "noChar")
         {
