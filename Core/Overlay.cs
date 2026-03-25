@@ -15,6 +15,8 @@ namespace ClemWin
         private List<IClemWinReceiver> receivers = [];
         private Background backgroundWindow;
         private Dictionary<IClemWinReceiver, Func<bool>> layers = new();
+        private bool searchActive;
+        private bool markersActive;
         public Windows WindowManager;
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public bool Intangible { get; set; } = true;
@@ -47,6 +49,7 @@ namespace ClemWin
             this.TopMost = true;
             this.TopLevel = true;
             this.Show();
+            UpdatePresentation();
 
             foreach (var receiver in receivers)
             {
@@ -184,6 +187,51 @@ namespace ClemWin
         public void HideBackground()
         {
             backgroundWindow.Hide();
+        }
+        public void SetSearchActive(bool active)
+        {
+            searchActive = active;
+            UpdatePresentation();
+        }
+        public void SetMarkersActive(bool active)
+        {
+            markersActive = active;
+            UpdatePresentation();
+        }
+        private void UpdatePresentation()
+        {
+            bool shouldShow = searchActive || markersActive;
+            bool shouldBeTopMost = searchActive;
+
+            if (shouldShow)
+            {
+                if (!Visible)
+                {
+                    Show();
+                }
+
+                if (TopMost != shouldBeTopMost)
+                {
+                    TopMost = shouldBeTopMost;
+                }
+                BringToFront();
+                return;
+            }
+
+            if (backgroundWindow.Visible)
+            {
+                backgroundWindow.Hide();
+            }
+
+            if (TopMost)
+            {
+                TopMost = false;
+            }
+
+            if (Visible)
+            {
+                Hide();
+            }
         }
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {

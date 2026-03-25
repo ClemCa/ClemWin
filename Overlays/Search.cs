@@ -56,12 +56,16 @@ namespace ClemWin
                 if (searchMode)
                 {
                     searchText = "";
+                    overlay.SetSearchActive(true);
                     overlay.ShowBackground();
                     overlay.BringToFront();
                     SetWindowLong(overlay.Handle, -20, overlay.ExStyle);
                 }
                 else
+                {
                     overlay.HideBackground();
+                    overlay.SetSearchActive(false);
+                }
                 overlay.Invalidate(); // trigger repaint when search mode changes
             }
         }

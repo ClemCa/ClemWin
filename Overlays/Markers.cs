@@ -25,9 +25,8 @@ namespace ClemWin
             this.whiteList = whiteList;
             WhiteList.OnWhitelistUpdated += () =>
             {
-                overlay.TopLevel = true;
-                overlay.TopMost = true;
                 markersVisible = whiteList.WhiteListMode;
+                overlay.SetMarkersActive(markersVisible);
                 if (markersVisible)
                 {
                     endpointTask.Cancel();
@@ -39,6 +38,7 @@ namespace ClemWin
                             return; // Task was canceled, do not proceed
                         }
                         markersVisible = false;
+                        overlay.SetMarkersActive(false);
                         overlay.Invalidate();
                     }, TaskScheduler.FromCurrentSynchronizationContext());
                 }
