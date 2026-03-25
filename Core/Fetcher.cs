@@ -79,6 +79,13 @@ namespace ClemWin
 
         public static SearchResult[] GetBySearch(string searchText)
         {
+            if (string.IsNullOrEmpty(searchText))
+            {
+                return GetWindowsOrdered()
+                    .Select(w => new SearchResult(w.handle, w.process, w.zIndex))
+                    .ToArray();
+            }
+
             var windows = GetWindowsOrdered()
                 .Select(w => new SearchResult(w.handle, w.process, w.zIndex))
                 .Do(w => w.CalculateScore(searchText))

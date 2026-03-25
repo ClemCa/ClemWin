@@ -56,6 +56,8 @@ namespace ClemWin
                 if (searchMode)
                 {
                     searchText = "";
+                    lastSearch = "";
+                    searchResults = Fetcher.GetBySearch(searchText);
                     overlay.SetSearchActive(true);
                     overlay.ShowBackground();
                     overlay.BringToFront();
@@ -142,15 +144,6 @@ namespace ClemWin
             {
                 return;
             }
-            if (string.IsNullOrEmpty(searchText))
-            {
-                if (lastSearch != searchText)
-                {
-                    lastSearch = searchText;
-                    searchResults = [];
-                }
-                return; // no need to fetch results if search text is empty or hasn't changed
-            }
             if (lastSearch == searchText)
             {
                 return; // no need to fetch results if search text hasn't changed
@@ -184,7 +177,7 @@ namespace ClemWin
         }
         private void DrawResults(Graphics g)
         {
-            if (!SearchMode || string.IsNullOrEmpty(searchText))
+            if (!SearchMode)
             {
                 return;
             }
